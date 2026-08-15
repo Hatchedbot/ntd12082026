@@ -61,6 +61,7 @@ git push -u origin main
 ## Evidencia de ejecución
 
 [Evidencia de ejecución] ![alt text](image.png)
+![alt text](image-1.png)
 
 ## Autor
 Joan Sebastian Lara Fuenmayor - 506242012
