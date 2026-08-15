@@ -1,12 +1,540 @@
 <!DOCTYPE html>
-<html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Document</title>
-    </head>
-    <body>
-        <h1>Bienvenido a la clase {{ person }}!</h1>
-        <h1>Contacto: {{ contacto }}</h1>
-    </body>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gestor de Tareas · Patrón MVC</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Inter:wght@400;500;600&display=swap');
+
+:root{
+  --bg:#0d1117;
+  --surface:#161b22;
+  --surface-2:#1c2230;
+  --border:#2a3142;
+  --text:#e6edf3;
+  --text-muted:#8b949e;
+  --model:#58a6ff;      /* azul: datos */
+  --controller:#f0b429;  /* ambar: coordinación */
+  --view:#7ce38b;        /* verde: salida/terminal */
+  --danger:#f85149;
+}
+
+*{box-sizing:border-box;}
+
+body{
+  margin:0;
+  background:
+    radial-gradient(circle at 15% 0%, rgba(88,166,255,0.06), transparent 40%),
+    radial-gradient(circle at 85% 100%, rgba(124,227,139,0.05), transparent 40%),
+    var(--bg);
+  color:var(--text);
+  font-family:'Inter', sans-serif;
+  min-height:100vh;
+  padding:32px 20px 60px;
+}
+
+.wrap{max-width:760px;margin:0 auto;}
+
+/* ---------- Header ---------- */
+header{margin-bottom:28px;}
+.eyebrow{
+  font-family:'JetBrains Mono',monospace;
+  font-size:12px;
+  letter-spacing:0.14em;
+  color:var(--text-muted);
+  text-transform:uppercase;
+  margin:0 0 6px;
+}
+h1{
+  font-family:'JetBrains Mono',monospace;
+  font-size:26px;
+  font-weight:800;
+  margin:0;
+  letter-spacing:-0.01em;
+}
+h1 span{color:var(--view);}
+
+.status-badge{
+  display:inline-flex;
+  align-items:center;
+  gap:7px;
+  margin-top:12px;
+  padding:6px 12px;
+  border-radius:20px;
+  border:1px solid var(--border);
+  background:var(--surface);
+  font-family:'JetBrains Mono',monospace;
+  font-size:12px;
+  color:var(--text-muted);
+  transition:border-color .2s ease, color .2s ease;
+}
+.status-badge .pip{
+  width:7px;height:7px;border-radius:50%;
+  background:var(--text-muted);
+  transition:background .2s ease, box-shadow .2s ease;
+}
+.status-badge.has-tasks{color:var(--text);border-color:rgba(88,166,255,0.35);}
+.status-badge.has-tasks .pip{background:var(--model);box-shadow:0 0 8px rgba(88,166,255,0.6);}
+.status-badge.empty{color:var(--text-muted);}
+.status-badge.empty .pip{background:var(--text-muted);}
+
+/* ---------- Diagrama MVC ---------- */
+.diagram{
+  display:flex;
+  align-items:center;
+  gap:0;
+  margin:24px 0 30px;
+  user-select:none;
+}
+.node{
+  flex:1;
+  border:1px solid var(--border);
+  background:var(--surface);
+  border-radius:8px;
+  padding:12px 10px;
+  text-align:center;
+  font-family:'JetBrains Mono',monospace;
+  font-size:11px;
+  letter-spacing:0.06em;
+  color:var(--text-muted);
+  transition:all .25s ease;
+  position:relative;
+}
+.node small{display:block;font-size:9px;margin-top:3px;opacity:.7;font-weight:400;letter-spacing:0.04em;}
+.node.active{
+  color:#0d1117;
+  transform:translateY(-2px);
+  box-shadow:0 6px 18px -4px rgba(0,0,0,.5);
+}
+.node[data-role="model"].active{background:var(--model);border-color:var(--model);}
+.node[data-role="controller"].active{background:var(--controller);border-color:var(--controller);}
+.node[data-role="view"].active{background:var(--view);border-color:var(--view);}
+.arrow{
+  width:26px;
+  text-align:center;
+  color:var(--border);
+  font-size:14px;
+  transition:color .25s ease;
+}
+.arrow.active{color:var(--text);}
+
+/* ---------- Panel principal ---------- */
+.panel{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:10px;
+  overflow:hidden;
+}
+.panel-head{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  padding:10px 14px;
+  border-bottom:1px solid var(--border);
+  background:var(--surface-2);
+}
+.dot{width:9px;height:9px;border-radius:50%;}
+.dot.r{background:#ff5f56;}
+.dot.y{background:#ffbd2e;}
+.dot.g{background:#27c93f;}
+.panel-head span{
+  font-family:'JetBrains Mono',monospace;
+  font-size:11px;
+  color:var(--text-muted);
+  margin-left:6px;
+}
+
+.panel-body{padding:18px;}
+
+/* input row estilo prompt */
+.prompt-row{
+  display:flex;
+  gap:8px;
+  margin-bottom:16px;
+}
+.prompt-row .prefix{
+  font-family:'JetBrains Mono',monospace;
+  color:var(--view);
+  display:flex;
+  align-items:center;
+  font-size:14px;
+}
+input[type="text"]{
+  flex:1;
+  background:var(--bg);
+  border:1px solid var(--border);
+  border-radius:6px;
+  padding:10px 12px;
+  color:var(--text);
+  font-family:'JetBrains Mono',monospace;
+  font-size:13px;
+  outline:none;
+  transition:border-color .15s ease;
+}
+input[type="text"]:focus{border-color:var(--model);}
+input[type="text"]::placeholder{color:var(--text-muted);}
+
+button{
+  font-family:'JetBrains Mono',monospace;
+  font-size:12px;
+  font-weight:600;
+  border:none;
+  border-radius:6px;
+  padding:0 16px;
+  cursor:pointer;
+  transition:filter .15s ease, transform .1s ease;
+}
+button:active{transform:scale(0.97);}
+.btn-add{background:var(--view);color:#0d1117;}
+.btn-add:hover{filter:brightness(1.08);}
+
+/* lista de tareas */
+.task-list{list-style:none;margin:0;padding:0;}
+.task-item{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding:10px 12px;
+  border:1px solid var(--border);
+  border-radius:6px;
+  margin-bottom:8px;
+  background:var(--bg);
+  animation:fadeIn .2s ease;
+}
+.task-idx{
+  font-family:'JetBrains Mono',monospace;
+  font-size:11px;
+  color:var(--model);
+  background:rgba(88,166,255,0.1);
+  border:1px solid rgba(88,166,255,0.3);
+  border-radius:4px;
+  padding:2px 6px;
+  min-width:22px;
+  text-align:center;
+}
+.task-name{flex:1;font-size:14px;}
+.task-del{
+  background:transparent;
+  color:var(--text-muted);
+  border:1px solid var(--border);
+  padding:4px 9px;
+  font-size:13px;
+}
+.task-del:hover{color:var(--danger);border-color:var(--danger);}
+
+.task-item.confirming{
+  border-color:rgba(248,81,73,0.5);
+  background:rgba(248,81,73,0.06);
+}
+.confirm-row{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  font-family:'JetBrains Mono',monospace;
+  font-size:12px;
+}
+.confirm-row .confirm-text{color:var(--danger);flex:1;}
+.confirm-yes, .confirm-no{
+  padding:4px 10px;
+  font-size:11px;
+}
+.confirm-yes{background:var(--danger);color:#fff;}
+.confirm-yes:hover{filter:brightness(1.1);}
+.confirm-no{background:transparent;border:1px solid var(--border);color:var(--text-muted);}
+.confirm-no:hover{color:var(--text);border-color:var(--text-muted);}
+
+.empty{
+  text-align:center;
+  padding:32px 10px;
+  color:var(--text-muted);
+  font-family:'JetBrains Mono',monospace;
+  font-size:12px;
+  border:1px dashed var(--border);
+  border-radius:8px;
+}
+.empty .empty-icon{
+  font-size:22px;
+  display:block;
+  margin-bottom:8px;
+  opacity:.6;
+}
+.empty .empty-sub{
+  display:block;
+  margin-top:4px;
+  font-size:11px;
+  color:var(--text-muted);
+  opacity:.7;
+}
+
+@keyframes fadeIn{from{opacity:0;transform:translateY(-4px);}to{opacity:1;transform:translateY(0);}}
+
+/* consola de salida (equivalente a View.show_message) */
+.console{
+  margin-top:18px;
+  border-top:1px solid var(--border);
+  padding-top:12px;
+}
+.console-label{
+  font-family:'JetBrains Mono',monospace;
+  font-size:10px;
+  letter-spacing:0.1em;
+  color:var(--text-muted);
+  margin-bottom:6px;
+}
+.console-log{
+  font-family:'JetBrains Mono',monospace;
+  font-size:12px;
+  color:var(--view);
+  min-height:18px;
+}
+.console-log .old{color:var(--text-muted);}
+
+footer{
+  text-align:center;
+  margin-top:24px;
+  font-family:'JetBrains Mono',monospace;
+  font-size:11px;
+  color:var(--text-muted);
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <p class="eyebrow">Ejemplo pedagógico</p>
+    <h1>Gestor de Tareas <span>· MVC</span></h1>
+    <div class="status-badge" id="statusBadge"><span class="pip"></span><span id="statusText">Cargando...</span></div>
+  </header>
+
+  <div class="diagram" id="diagram">
+    <div class="node" data-role="model">MODEL<small>datos · lógica</small></div>
+    <div class="arrow">→</div>
+    <div class="node" data-role="controller">CONTROLLER<small>coordina</small></div>
+    <div class="arrow">→</div>
+    <div class="node" data-role="view">VIEW<small>presenta</small></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head">
+      <div class="dot r"></div><div class="dot y"></div><div class="dot g"></div>
+      <span>todo_controller.start()</span>
+    </div>
+    <div class="panel-body">
+
+      <div class="prompt-row">
+        <span class="prefix">$</span>
+        <input type="text" id="taskInput" placeholder="Nombre de la tarea..." maxlength="120">
+        <button class="btn-add" id="addBtn">Agregar</button>
+      </div>
+
+      <ul class="task-list" id="taskList"></ul>
+      <div class="empty" id="emptyState" style="display:none;">
+        <span class="empty-icon">◇</span>
+        No tienes tareas pendientes
+        <span class="empty-sub">Escribe una arriba y presiona Enter</span>
+      </div>
+
+      <div class="console">
+        <p class="console-label">SALIDA</p>
+        <div class="console-log" id="consoleLog">&gt;&gt; Sistema listo. Agrega tu primera tarea.</div>
+      </div>
+
+    </div>
+  </div>
+
+  <footer>TodoModel · TodoView · TodoController — misma estructura que to-do.py</footer>
+</div>
+
+<script>
+/* ==========================================
+   1. MODELO (MODEL)
+   Responsabilidad: gestionar datos y lógica de negocio.
+   Espejo exacto de TodoModel en to-do.py
+========================================== */
+class TodoModel {
+  constructor(){
+    this._tasks = []; // "base de datos" simulada en memoria
+  }
+  addTask(name){
+    if (name && name.trim() !== ""){
+      this._tasks.push(name.trim());
+      return true;
+    }
+    return false;
+  }
+  getAllTasks(){
+    return this._tasks;
+  }
+  deleteTask(index){
+    if (index >= 0 && index < this._tasks.length){
+      return this._tasks.splice(index, 1)[0];
+    }
+    return null;
+  }
+}
+
+/* ==========================================
+   2. VISTA (VIEW)
+   Responsabilidad: presentar información (DOM).
+   Espejo de TodoView en to-do.py
+========================================== */
+class TodoView {
+  constructor(){
+    this.listEl = document.getElementById('taskList');
+    this.emptyEl = document.getElementById('emptyState');
+    this.logEl = document.getElementById('consoleLog');
+    this.inputEl = document.getElementById('taskInput');
+    this.badgeEl = document.getElementById('statusBadge');
+    this.badgeTextEl = document.getElementById('statusText');
+  }
+
+  displayTasks(tasks, onDelete){
+    this.updateStatusBadge(tasks.length);
+
+    this.listEl.innerHTML = "";
+    if (tasks.length === 0){
+      this.emptyEl.style.display = "block";
+      return;
+    }
+    this.emptyEl.style.display = "none";
+    tasks.forEach((task, i) => {
+      const li = document.createElement('li');
+      li.className = 'task-item';
+      li.innerHTML = `
+        <span class="task-idx">${i}</span>
+        <span class="task-name"></span>
+        <button class="task-del" title="Eliminar">✕</button>
+      `;
+      li.querySelector('.task-name').textContent = task;
+
+      // Paso 1: pedir confirmación en lugar de borrar directo
+      li.querySelector('.task-del').addEventListener('click', () => {
+        li.classList.add('confirming');
+        li.innerHTML = `
+          <div class="confirm-row">
+            <span class="confirm-text">¿Eliminar "${task}"?</span>
+            <button class="confirm-yes">Sí, borrar</button>
+            <button class="confirm-no">Cancelar</button>
+          </div>
+        `;
+        // Paso 2a: confirmar -> se ejecuta el borrado real
+        li.querySelector('.confirm-yes').addEventListener('click', () => onDelete(i));
+        // Paso 2b: cancelar -> se repinta la lista tal cual estaba
+        li.querySelector('.confirm-no').addEventListener('click', () => this.displayTasks(tasks, onDelete));
+      });
+
+      this.listEl.appendChild(li);
+    });
+  }
+
+  updateStatusBadge(count){
+    if (count === 0){
+      this.badgeEl.classList.remove('has-tasks');
+      this.badgeEl.classList.add('empty');
+      this.badgeTextEl.textContent = "Sin tareas pendientes";
+    } else {
+      this.badgeEl.classList.remove('empty');
+      this.badgeEl.classList.add('has-tasks');
+      this.badgeTextEl.textContent = count === 1 ? "1 tarea pendiente" : `${count} tareas pendientes`;
+    }
+  }
+
+  showMessage(message){
+    this.logEl.innerHTML = `<span class="old">&gt;&gt;</span> ${message}`;
+  }
+
+  getInputValue(){
+    return this.inputEl.value;
+  }
+
+  clearInput(){
+    this.inputEl.value = "";
+    this.inputEl.focus();
+  }
+}
+
+/* ==========================================
+   3. CONTROLADOR (CONTROLLER)
+   Responsabilidad: intermediario entre Model y View.
+   Espejo de TodoController en to-do.py
+========================================== */
+class TodoController {
+  constructor(model, view){
+    this.model = model;
+    this.view = view;
+  }
+
+  start(){
+    this.listTasks();
+    document.getElementById('addBtn').addEventListener('click', () => this.addTask());
+    this.view.inputEl.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') this.addTask();
+    });
+  }
+
+  listTasks(){
+    highlight(['model','view']);
+    const tasks = this.model.getAllTasks();
+    this.view.displayTasks(tasks, (idx) => this.removeTask(idx));
+  }
+
+  addTask(){
+    highlight(['controller','model']);
+    const name = this.view.getInputValue();
+    const ok = this.model.addTask(name);
+    setTimeout(() => {
+      if (ok){
+        this.view.showMessage(`Tarea agregada con éxito: "${name.trim()}"`);
+        this.view.clearInput();
+      } else {
+        this.view.showMessage("Error: el nombre no puede estar vacío.");
+      }
+      this.listTasks();
+    }, 180);
+  }
+
+  removeTask(idx){
+    highlight(['controller','model']);
+    const removed = this.model.deleteTask(idx);
+    setTimeout(() => {
+      if (removed !== null){
+        this.view.showMessage(`Tarea eliminada: "${removed}"`);
+      } else {
+        this.view.showMessage("Índice no encontrado.");
+      }
+      this.listTasks();
+    }, 180);
+  }
+}
+
+/* ---------- animación del diagrama MVC ---------- */
+function highlight(roles){
+  const nodes = document.querySelectorAll('.node');
+  const arrows = document.querySelectorAll('.arrow');
+  nodes.forEach(n => n.classList.remove('active'));
+  arrows.forEach(a => a.classList.remove('active'));
+  roles.forEach((r, i) => {
+    setTimeout(() => {
+      document.querySelector(`.node[data-role="${r}"]`).classList.add('active');
+      if (i > 0) arrows[0].classList.add('active');
+    }, i * 160);
+  });
+  setTimeout(() => {
+    nodes.forEach(n => n.classList.remove('active'));
+    arrows.forEach(a => a.classList.remove('active'));
+  }, roles.length * 160 + 500);
+}
+
+/* ==========================================
+   PUNTO DE ENTRADA (BOOTSTRAP)
+   Igual que el bloque __main__ de to-do.py
+========================================== */
+const appModel = new TodoModel();
+const appView = new TodoView();
+const appController = new TodoController(appModel, appView);
+appController.start();
+</script>
+</body>
 </html>
